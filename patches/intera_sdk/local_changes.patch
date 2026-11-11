@@ -1,0 +1,139 @@
+diff --git a/intera_examples/CMakeLists.txt b/intera_examples/CMakeLists.txt
+index 38523d8..c5163fb 100644
+--- a/intera_examples/CMakeLists.txt
++++ b/intera_examples/CMakeLists.txt
+@@ -64,6 +64,7 @@ catkin_install_python(PROGRAMS
+   scripts/camera_display.py
+   scripts/send_random_trajectory.py
+   scripts/send_traj_from_file.py
++  scripts/ura_test.py
+ 
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+ 
+diff --git a/intera_examples/scripts/go_to_joint_angles_in_contact.py b/intera_examples/scripts/go_to_joint_angles_in_contact.py
+index f3729be..8b297a6 100755
+--- a/intera_examples/scripts/go_to_joint_angles_in_contact.py
++++ b/intera_examples/scripts/go_to_joint_angles_in_contact.py
+@@ -102,7 +102,7 @@ def main():
+         help="Activate (1) or Deactivate (0) interaction controller")
+     parser.add_argument(
+         "-k", "--K_impedance", type=float,
+-        nargs='+', default=[1300.0, 1300.0, 1300.0, 30.0, 30.0, 30.0],
++        nargs='+', default=[1000.0, 1000.0, 1000.0, 5.0, 5.0, 5.0],
+         help="A list of desired stiffnesses, one for each of the 6 directions -- stiffness units are (N/m) for first 3 and (Nm/rad) for second 3 values")
+     parser.add_argument(
+         "-m", "--max_impedance", type=int,
+diff --git a/intera_examples/scripts/joint_position_file_playback.py b/intera_examples/scripts/joint_position_file_playback.py
+index f5b87d3..a44b72d 100755
+--- a/intera_examples/scripts/joint_position_file_playback.py
++++ b/intera_examples/scripts/joint_position_file_playback.py
+@@ -64,12 +64,13 @@ def map_file(filename, limb, loops=1):
+     """
+     limb_interface = intera_interface.Limb(limb)
+     has_gripper = False
+-    try:
+-        gripper = intera_interface.Gripper(limb + '_gripper')
+-    except:
+-        has_gripper = False
+-        rospy.loginfo("Could not detect a gripper attached to the robot")
++#    try:
++#        gripper = intera_interface.Gripper(limb + '_gripper')
++#    except:
++#        has_gripper = False
++#        rospy.loginfo("Could not detect a gripper attached to the robot")
+ 
++    has_gripper = False
+     rate = rospy.Rate(100)
+     if has_gripper:
+         if gripper.has_error():
+@@ -89,7 +90,9 @@ def map_file(filename, limb, loops=1):
+         l += 1
+         print("Moving to start position...")
+         _cmd, cmd_start, _raw = clean_line(lines[1], keys)
++        print(lines[1])
+         limb_interface.move_to_joint_positions(cmd_start)
++        print(cmd_start)
+         start_time = rospy.get_time()
+         for values in lines[1:]:
+             i += 1
+diff --git a/intera_examples/scripts/joint_trajectory_file_playback.py b/intera_examples/scripts/joint_trajectory_file_playback.py
+index 5e15124..f04fdbd 100755
+--- a/intera_examples/scripts/joint_trajectory_file_playback.py
++++ b/intera_examples/scripts/joint_trajectory_file_playback.py
+@@ -69,11 +69,11 @@ class Trajectory(object):
+         self.limb = limb
+         self.gripper_name = '_'.join([limb, 'gripper'])
+         #gripper interface - for gripper command playback
+-        try:
+-            self.gripper = intera_interface.Gripper(self.gripper_name)
+-        except:
+-            self.gripper = None
+-            rospy.loginfo("Did not detect a connected electric gripper.")
++#        try:
++#            self.gripper = intera_interface.Gripper(self.gripper_name)
++#        except:
++#            self.gripper = None
++#            rospy.loginfo("Did not detect a connected electric gripper.")
+ 
+         #flag to signify the arm trajectories have begun executing
+         self._arm_trajectory_started = False
+@@ -81,17 +81,17 @@ class Trajectory(object):
+         self._lock = threading.RLock()
+ 
+         # Verify Grippers Have No Errors and are Calibrated
+-        if self.gripper:
+-            if self.gripper.has_error():
+-                self.gripper.reboot()
+-            if not self.gripper.is_calibrated():
+-                self.gripper.calibrate()
++ #       if self.gripper:
++ #           if self.gripper.has_error():
++ #               self.gripper.reboot()
++ #           if not self.gripper.is_calibrated():
++ #               self.gripper.calibrate()
+ 
+-            #gripper goal trajectories
+-            self.grip = FollowJointTrajectoryGoal()
++ #           #gripper goal trajectories
++ #           self.grip = FollowJointTrajectoryGoal()
+ 
+-            #gripper control rate
+-            self._gripper_rate = 20.0  # Hz
++#            #gripper control rate
++#            self._gripper_rate = 20.0  # Hz
+ 
+         # Timing offset to prevent gripper playback before trajectory has started
+         self._slow_move_offset = 0.0
+@@ -191,7 +191,7 @@ class Trajectory(object):
+             diffs = list(map(operator.sub, cmd, cur))
+             diffs = list(map(operator.abs, diffs))
+             #determine the largest time offset necessary across all joints
+-            offset = max(list(map(operator.div, diffs, dflt_vel)))
++            offset = max(list(map(operator.truediv, diffs, dflt_vel)))
+             return offset
+ 
+         for idx, values in enumerate(lines[1:]):
+@@ -213,9 +213,9 @@ class Trajectory(object):
+             #add a point for this set of commands with recorded time
+             cur_cmd = [cmd[jnt] for jnt in self.goal.trajectory.joint_names]
+             self._add_point(cur_cmd, self.limb, values[0] + start_offset)
+-            if self.gripper:
+-                cur_cmd = [cmd[self.gripper_name]]
+-                self._add_point(cur_cmd, self.gripper_name, values[0] + start_offset)
++            #if self.gripper:
++            #    cur_cmd = [cmd[self.gripper_name]]
++            #    self._add_point(cur_cmd, self.gripper_name, values[0] + start_offset)
+ 
+     def _feedback(self, data):
+         # Test to see if the actual playback time has exceeded
+@@ -245,8 +245,8 @@ class Trajectory(object):
+         # Syncronize playback by waiting for the trajectories to start
+         while not rospy.is_shutdown() and not self._get_trajectory_flag():
+             rospy.sleep(0.05)
+-        if self.gripper:
+-            self._execute_gripper_commands()
++        #if self.gripper:
++        #    self._execute_gripper_commands()
+ 
+     def stop(self):
+         """
